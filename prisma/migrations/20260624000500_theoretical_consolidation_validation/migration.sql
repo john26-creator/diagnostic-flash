@@ -1,0 +1,7 @@
+CREATE TYPE "OrganizationStatus" AS ENUM ('ORGANIZATION_DRAFT', 'ORGANIZATION_NEEDS_REVIEW', 'ORGANIZATION_VALIDATED', 'ORGANIZATION_VALIDATED_WITH_OPEN_QUESTIONS');
+CREATE TYPE "TheoreticalWorkflowType" AS ENUM ('TRAIN', 'TEAM', 'INCIDENT', 'DELIVERY');
+
+ALTER TABLE "Mission" ADD COLUMN "organizationStatus" "OrganizationStatus" NOT NULL DEFAULT 'ORGANIZATION_DRAFT';
+
+ALTER TABLE "TheoreticalExtractionItem" ADD COLUMN "personName" TEXT;
+ALTER TABLE "TheoreticalExtractionItem" ADD COLUMN "workflowType" "TheoreticalWorkflowType";

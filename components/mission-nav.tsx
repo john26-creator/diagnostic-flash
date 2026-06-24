@@ -15,18 +15,26 @@ const items = [
   ["Synthese", "synthesis"]
 ] as const;
 
-export function MissionNav({ missionId, organizationLocked = false }: { missionId: string; organizationLocked?: boolean }) {
+export function MissionNav({
+  missionId,
+  organizationLocked = false,
+  observedLocked = false
+}: {
+  missionId: string;
+  organizationLocked?: boolean;
+  observedLocked?: boolean;
+}) {
   const pathname = usePathname();
   return (
     <nav className="flex gap-1 overflow-x-auto border-b border-gold/35 bg-white px-4 py-2 shadow-sm">
       {items.map(([label, path]) => {
-        const locked = organizationLocked && path === "organization";
+        const locked = (organizationLocked && path === "organization") || (observedLocked && path === "observed");
         const href = `/app/missions/${missionId}${path ? `/${path}` : ""}`;
         return locked ? (
           <span
             key={label}
             aria-disabled="true"
-            title="Validez le besoin avant d'acceder a l'organisation theorique."
+            title={path === "observed" ? "Validez le modele theorique avant d'acceder a l'observe." : "Validez le besoin avant d'acceder a l'organisation theorique."}
             className="cursor-not-allowed rounded-md px-3 py-2 text-sm font-medium text-slatecopy/55"
           >
             {label}

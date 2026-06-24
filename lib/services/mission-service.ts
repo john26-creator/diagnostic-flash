@@ -24,6 +24,23 @@ export async function getMission(userId: string, missionId: string) {
       need: { include: { symptoms: true, aiClarifications: true } },
       sources: { orderBy: { createdAt: "desc" } },
       sourceDocumentaires: { orderBy: { dateAjout: "desc" } },
+      jiraInstance: {
+        include: {
+          projects: { orderBy: { key: "asc" } },
+          boards: {
+            orderBy: { name: "asc" },
+            include: {
+              project: true,
+              workflow: {
+                include: {
+                  steps: { orderBy: { order: "asc" }, include: { statuses: { orderBy: { name: "asc" } } } }
+                }
+              }
+            }
+          }
+        }
+      },
+      theoreticalExtractionItems: { orderBy: [{ kind: "asc" }, { workflowOrder: "asc" }, { createdAt: "asc" }] },
       roles: true,
       persons: { include: { role: true } },
       activities: { include: { raciAssignments: { include: { role: true } } } },

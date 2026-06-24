@@ -88,6 +88,47 @@ enum SourceStatut {
   ERREUR
 }
 
+enum OrganizationStatus {
+  ORGANIZATION_DRAFT
+  ORGANIZATION_NEEDS_REVIEW
+  ORGANIZATION_VALIDATED
+  ORGANIZATION_VALIDATED_WITH_OPEN_QUESTIONS
+}
+
+enum ExtractionIAStatus {
+  DETECTED
+  CONFIRMED
+  REJECTED
+}
+
+enum ExtractionIAKind {
+  ROLE
+  RESPONSIBILITY
+  WORKFLOW_STEP
+  AMBIGUITY
+  QUESTION
+}
+
+enum TheoreticalWorkflowType {
+  TRAIN
+  TEAM
+  INCIDENT
+  DELIVERY
+}
+
+enum JiraConnectionStatus {
+  NOT_CONFIGURED
+  SAVED
+  CONNECTED
+  ERROR
+}
+
+enum JiraWorkflowType {
+  TRAIN
+  TEAM
+  UNKNOWN
+}
+
 enum RawDataType {
   RAW_JIRA_ISSUE
   RAW_JIRA_COMMENT
@@ -276,6 +317,7 @@ model Mission {
   name                   String
   description            String?
   status                 MissionStatus @default(DRAFT)
+  organizationStatus     OrganizationStatus @default(ORGANIZATION_DRAFT)
   investigationStartDate DateTime?
   investigationEndDate   DateTime?
   createdAt              DateTime      @default(now())
@@ -286,6 +328,9 @@ model Mission {
   need                     Need?
   sources                  Source[]
   sourceDocumentaires      SourceDocumentaire[]
+  theoreticalExtractions   TheoreticalExtraction[]
+  theoreticalExtractionItems TheoreticalExtractionItem[]
+  jiraInstance             JiraInstance?
   rawData                  RawData[]
   detectedConfigurations   DetectedConfiguration[]
   artifactMappings         ArtifactMapping[]
@@ -404,11 +449,165 @@ model SourceDocumentaire {
   updatedAt     DateTime     @updatedAt
 
   mission Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  theoreticalExtractions TheoreticalExtraction[]
+  theoreticalExtractionItems TheoreticalExtractionItem[]
 
   @@index([missionId])
   @@index([type])
   @@index([statut])
   @@index([dateAjout])
+}
+
+model TheoreticalExtraction {
+  id                    String   @id @default(cuid())
+  missionId             String
+  sourceDocumentaireId  String?
+  summary               String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  mission Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  sourceDocumentaire SourceDocumentaire? @relation(fields: [sourceDocumentaireId], references: [id], onDelete: SetNull)
+  items TheoreticalExtractionItem[]
+
+  @@index([missionId])
+  @@index([sourceDocumentaireId])
+}
+
+model TheoreticalExtractionItem {
+  id                    String             @id @default(cuid())
+  extractionId           String
+  missionId              String
+  sourceDocumentaireId   String?
+  kind                  ExtractionIAKind
+  label                 String
+  detail                String?
+  detectedRole          String?
+  detectedActivity      String?
+  personName            String?
+  workflowType          TheoreticalWorkflowType?
+  workflowOrder         Int?
+  confidence            Float              @default(0.7)
+  status                ExtractionIAStatus @default(DETECTED)
+  correction            String?
+  mappedCanonicalRole   CanonicalRole?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  extraction TheoreticalExtraction @relation(fields: [extractionId], references: [id], onDelete: Cascade)
+  mission Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  sourceDocumentaire SourceDocumentaire? @relation(fields: [sourceDocumentaireId], references: [id], onDelete: SetNull)
+
+  @@index([extractionId])
+  @@index([missionId])
+  @@index([sourceDocumentaireId])
+  @@index([kind])
+  @@index([status])
+}
+
+model JiraInstance {
+  id                String               @id @default(cuid())
+  missionId         String               @unique
+  url               String
+  email             String
+  apiTokenEncrypted String?
+  instanceName      String?
+  status            JiraConnectionStatus @default(NOT_CONFIGURED)
+  lastTestedAt      DateTime?
+  lastSyncAt        DateTime?
+  lastError         String?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  mission   Mission       @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  projects  JiraProject[]
+  boards    JiraBoard[]
+  workflows JiraWorkflow[]
+
+  @@index([status])
+}
+
+model JiraProject {
+  id             String   @id @default(cuid())
+  jiraInstanceId String
+  externalId     String
+  key            String
+  name           String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  jiraInstance JiraInstance @relation(fields: [jiraInstanceId], references: [id], onDelete: Cascade)
+  boards       JiraBoard[]
+
+  @@unique([jiraInstanceId, externalId])
+  @@unique([jiraInstanceId, key])
+  @@index([jiraInstanceId])
+}
+
+model JiraBoard {
+  id             String   @id @default(cuid())
+  jiraInstanceId String
+  projectId      String?
+  externalId     Int
+  name           String
+  type           String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  jiraInstance JiraInstance @relation(fields: [jiraInstanceId], references: [id], onDelete: Cascade)
+  project      JiraProject? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  workflow     JiraWorkflow?
+
+  @@unique([jiraInstanceId, externalId])
+  @@index([jiraInstanceId])
+  @@index([projectId])
+}
+
+model JiraWorkflow {
+  id             String           @id @default(cuid())
+  jiraInstanceId String
+  boardId        String           @unique
+  name           String
+  type           JiraWorkflowType @default(UNKNOWN)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  jiraInstance JiraInstance       @relation(fields: [jiraInstanceId], references: [id], onDelete: Cascade)
+  board        JiraBoard          @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  steps        JiraWorkflowStep[]
+
+  @@index([jiraInstanceId])
+  @@index([type])
+}
+
+model JiraWorkflowStep {
+  id         String   @id @default(cuid())
+  workflowId String
+  order      Int
+  name       String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  workflow JiraWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  statuses JiraStatus[]
+
+  @@unique([workflowId, order])
+  @@index([workflowId])
+}
+
+model JiraStatus {
+  id        String   @id @default(cuid())
+  stepId    String
+  externalId String?
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  step JiraWorkflowStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
+
+  @@unique([stepId, name])
+  @@index([stepId])
+  @@index([externalId])
 }
 
 model RawData {

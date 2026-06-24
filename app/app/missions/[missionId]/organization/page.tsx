@@ -7,6 +7,11 @@ import { seedTheoryAction } from "@/lib/actions/actions";
 import { ExportActions } from "@/components/export-actions";
 import { redirect } from "next/navigation";
 import { SourceDocumentsPanel } from "@/app/app/missions/[missionId]/organization/source-documents-panel";
+import { AIExtractionSection } from "@/app/app/missions/[missionId]/organization/ai-extraction-section";
+import { PersonRoleConsolidationSection } from "@/app/app/missions/[missionId]/organization/person-role-consolidation-section";
+import { WorkflowConsolidationSection } from "@/app/app/missions/[missionId]/organization/workflow-consolidation-section";
+import { OrganizationValidationForm } from "@/app/app/missions/[missionId]/organization/organization-validation-form";
+import { buildPersonRoleConsolidation, buildWorkflowConsolidation } from "@/lib/services/theoretical-extraction-service";
 
 export default async function OrganizationPage({ params }: { params: Promise<{ missionId: string }> }) {
   const { missionId } = await params;
@@ -15,6 +20,9 @@ export default async function OrganizationPage({ params }: { params: Promise<{ m
   if (mission.need?.status !== "VALIDATED" && mission.need?.status !== "VALIDATED_WITH_OPEN_QUESTIONS") {
     redirect(`/app/missions/${mission.id}/need`);
   }
+  const sourceRefs = mission.sourceDocumentaires.map((source) => ({ id: source.id, nom: source.nom }));
+  const consolidatedPeople = buildPersonRoleConsolidation(mission.theoreticalExtractionItems, sourceRefs);
+  const consolidatedWorkflows = buildWorkflowConsolidation(mission.theoreticalExtractionItems, sourceRefs);
   return (
     <>
       <PageHeader title="Organisation theorique" description="Modele attendu valide par le consultant : roles, RACI et flux cible." status={mission.status}>
@@ -36,6 +44,28 @@ export default async function OrganizationPage({ params }: { params: Promise<{ m
             dateAjout: source.dateAjout.toISOString()
           }))}
         />
+        <AIExtractionSection
+          missionId={mission.id}
+          items={mission.theoreticalExtractionItems.map((item) => ({
+            id: item.id,
+            kind: item.kind,
+            label: item.label,
+            detail: item.detail,
+            detectedRole: item.detectedRole,
+            detectedActivity: item.detectedActivity,
+            workflowOrder: item.workflowOrder,
+            confidence: item.confidence,
+            status: item.status,
+            correction: item.correction,
+            mappedCanonicalRole: item.mappedCanonicalRole
+          }))}
+        />
+        <PersonRoleConsolidationSection missionId={mission.id} people={consolidatedPeople} />
+        <WorkflowConsolidationSection missionId={mission.id} workflows={consolidatedWorkflows} />
+        <div className="xl:col-span-2">
+          <h2 className="text-lg font-semibold text-night">RACI / roles / flux theorique consolides</h2>
+          <p className="mt-1 text-sm text-slatecopy">Elements valides par le consultant et modele demo existant.</p>
+        </div>
         <Card>
           <CardHeader><CardTitle>Roles et mapping</CardTitle></CardHeader>
           <CardContent className="grid gap-3">
@@ -64,6 +94,7 @@ export default async function OrganizationPage({ params }: { params: Promise<{ m
             ))}
           </CardContent>
         </Card>
+        <OrganizationValidationForm missionId={mission.id} organizationStatus={mission.organizationStatus} />
       </main>
     </>
   );

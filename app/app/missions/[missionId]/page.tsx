@@ -8,6 +8,7 @@ import { getMission, missionProgress } from "@/lib/services/mission-service";
 import { formatDate, percent } from "@/lib/utils";
 import { runMockAnalysisAction } from "@/lib/actions/actions";
 import { cn } from "@/lib/utils";
+import { JiraConnectionPanel } from "@/app/app/missions/[missionId]/jira-connection-panel";
 
 const linkButton = "inline-flex h-10 items-center justify-center rounded-md border border-gold/60 bg-white px-4 text-sm font-medium text-night hover:bg-gold/10";
 
@@ -46,6 +47,32 @@ export default async function MissionCockpitPage({ params }: { params: Promise<{
             <div className="flex items-center justify-between text-sm"><span>{percent(progress)}</span><StatusBadge value={mission.status} /></div>
           </CardContent>
         </Card>
+        <JiraConnectionPanel
+          missionId={mission.id}
+          jira={mission.jiraInstance ? {
+            url: mission.jiraInstance.url,
+            email: mission.jiraInstance.email,
+            status: mission.jiraInstance.status,
+            instanceName: mission.jiraInstance.instanceName,
+            lastTestedAt: mission.jiraInstance.lastTestedAt?.toISOString() ?? null,
+            lastSyncAt: mission.jiraInstance.lastSyncAt?.toISOString() ?? null,
+            lastError: mission.jiraInstance.lastError,
+            projects: mission.jiraInstance.projects.map((project) => ({ key: project.key, name: project.name })),
+            boards: mission.jiraInstance.boards.map((board) => ({
+              externalId: board.externalId,
+              name: board.name,
+              type: board.type,
+              workflow: board.workflow ? {
+                name: board.workflow.name,
+                type: board.workflow.type,
+                steps: board.workflow.steps.map((step) => ({
+                  name: step.name,
+                  statuses: step.statuses.map((status) => ({ name: status.name }))
+                }))
+              } : null
+            }))
+          } : null}
+        />
         <section className="grid gap-4 lg:grid-cols-2">
           <Card>
             <CardHeader><CardTitle>Informations generales</CardTitle></CardHeader>
