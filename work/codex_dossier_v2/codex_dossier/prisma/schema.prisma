@@ -1,0 +1,710 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole { CONSULTANT ADMIN }
+enum MissionStatus { DRAFT NEED_VALIDATED THEORETICAL_MODEL_READY DATA_IMPORTED OBSERVED_MODEL_READY GAPS_IDENTIFIED INVESTIGATION_READY SYNTHESIS_READY COMPLETED ARCHIVED }
+enum ClarificationType { OMISSION GENERALISATION NOMINALISATION DISTORSION AMBIGUITY LACK_OF_CONTEXT }
+enum ClarificationStatus { PROPOSED ACCEPTED REJECTED RESOLVED }
+enum SourceType { JIRA ORGANIGRAM RACI SLA CONFLUENCE DOCUMENT CSV MANUAL }
+enum SourceStatus { PENDING CONNECTED IMPORTED FAILED ARCHIVED }
+enum RawDataType { RAW_JIRA_ISSUE RAW_JIRA_COMMENT RAW_JIRA_CHANGELOG RAW_JIRA_SPRINT RAW_JIRA_BOARD RAW_JIRA_WORKFLOW RAW_DOCUMENT RAW_ORGANIGRAM RAW_SLA }
+enum DetectedConfigurationType { ISSUE_TYPE STATUS WORKFLOW CUSTOM_FIELD ROLE_LABEL SPRINT_FIELD PI_FIELD }
+enum CanonicalStatus { IDEA READY IN_PROGRESS WAITING VALIDATION DONE CANCELLED }
+enum CanonicalRole { SPONSOR PM PO RTE ARCHITECT SCRUM_MASTER BA DEV QA MANAGER OTHER }
+enum RaciLevel { R A C I }
+enum ArtifactType { INITIATIVE EPIC FEATURE USER_STORY TECHNICAL_STORY ENABLER TASK BUG INCIDENT }
+enum CanonicalEventType { CREATED STATUS_CHANGED COMMENTED DESCRIPTION_CHANGED ASSIGNEE_CHANGED PRIORITY_CHANGED STORY_POINTS_CHANGED SPRINT_CHANGED PARENT_CHANGED VALIDATED BLOCKED UNBLOCKED MENTIONED }
+enum DetectionLevel { INFORMATION ATTENTION CRITICAL }
+enum ObservationStatus { PROPOSED ACCEPTED REJECTED TO_INVESTIGATE }
+enum ProofType { TICKET COMMENT STATUS_CHANGE FIELD_CHANGE SPRINT_CHANGE DOCUMENT METRIC }
+enum GapClassification { COHERENT LOCAL_VARIANT SURPRISING VERY_SURPRISING }
+enum HypothesisStatus { SUGGESTED RETAINED DISCARDED VALIDATED INVALIDATED }
+enum ConfidenceLabel { LOW MEDIUM HIGH }
+enum Priority { LOW MEDIUM HIGH }
+enum InterviewStatus { PLANNED DONE CANCELLED }
+enum DeliverableType { VALIDATED_NEED THEORETICAL_MODEL OBSERVED_MODEL GAP_MAP PRE_DIAGNOSTIC INVESTIGATION_PLAN INVESTIGATION_SYNTHESIS }
+enum DeliverableStatus { DRAFT GENERATED VALIDATED EXPORTED }
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  role      UserRole @default(CONSULTANT)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  clients  Client[]
+  missions Mission[]
+}
+
+model Client {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  industry    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  missions Mission[]
+
+  @@index([userId])
+}
+
+model Mission {
+  id                     String        @id @default(cuid())
+  clientId               String
+  userId                 String
+  name                   String
+  description            String?
+  status                 MissionStatus @default(DRAFT)
+  investigationStartDate DateTime?
+  investigationEndDate   DateTime?
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
+
+  client                   Client                    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user                     User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  need                     Need?
+  sources                  Source[]
+  rawData                  RawData[]
+  detectedConfigurations   DetectedConfiguration[]
+  artifactMappings         ArtifactMapping[]
+  statusMappings           StatusMapping[]
+  roleMappings             RoleMapping[]
+  roles                    Role[]
+  persons                  Person[]
+  activities               Activity[]
+  raciAssignments          RaciAssignment[]
+  theoreticalFlows         TheoreticalFlow[]
+  canonicalArtifacts       CanonicalArtifact[]
+  canonicalEvents          CanonicalEvent[]
+  sprints                  Sprint[]
+  pis                      PI[]
+  metrics                  Metric[]
+  phenomenonDetections     PhenomenonDetection[]
+  observations             Observation[]
+  proofs                   Proof[]
+  gaps                     Gap[]
+  hypotheses               Hypothesis[]
+  investigationQuestions   InvestigationQuestion[]
+  interviews               Interview[]
+  investigationSynthesis   InvestigationSynthesis?
+  deliverables             Deliverable[]
+
+  @@index([clientId])
+  @@index([userId])
+  @@index([status])
+}
+
+model Need {
+  id                   String    @id @default(cuid())
+  missionId            String    @unique
+  rawNeed              String?
+  validatedNeed        String?
+  investigationPurpose String?
+  initialScope         String?
+  observedScope        String?
+  validatedAt          DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  mission          Mission           @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  symptoms         Symptom[]
+  aiClarifications AIClarification[]
+}
+
+model Symptom {
+  id          String   @id @default(cuid())
+  needId      String
+  missionId   String
+  label       String
+  description String?
+  source      String?
+  createdAt   DateTime @default(now())
+
+  need Need @relation(fields: [needId], references: [id], onDelete: Cascade)
+
+  @@index([needId])
+  @@index([missionId])
+}
+
+model AIClarification {
+  id         String              @id @default(cuid())
+  needId     String
+  type       ClarificationType
+  sourceText String?
+  question   String
+  status     ClarificationStatus @default(PROPOSED)
+  createdAt  DateTime            @default(now())
+
+  need Need @relation(fields: [needId], references: [id], onDelete: Cascade)
+
+  @@index([needId])
+  @@index([type])
+}
+
+model Source {
+  id             String       @id @default(cuid())
+  missionId      String
+  type           SourceType
+  name           String
+  status         SourceStatus @default(PENDING)
+  connectionInfo Json?
+  filePath       String?
+  importedAt     DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  mission Mission   @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  rawData RawData[]
+  detectedConfigurations DetectedConfiguration[]
+  canonicalArtifacts CanonicalArtifact[]
+
+  @@index([missionId])
+  @@index([type])
+  @@index([status])
+}
+
+model RawData {
+  id         String      @id @default(cuid())
+  missionId  String
+  sourceId   String
+  type       RawDataType
+  externalId String?
+  payloadJson Json
+  createdAt  DateTime    @default(now())
+
+  mission Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  source  Source  @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  canonicalEvents CanonicalEvent[]
+
+  @@index([missionId])
+  @@index([sourceId])
+  @@index([externalId])
+}
+
+model DetectedConfiguration {
+  id           String                    @id @default(cuid())
+  missionId    String
+  sourceId     String
+  type         DetectedConfigurationType
+  name         String
+  rawValue     String?
+  metadataJson Json?
+  createdAt    DateTime                  @default(now())
+
+  mission Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  source  Source  @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@index([missionId])
+  @@index([sourceId])
+}
+
+model ArtifactMapping {
+  id                    String       @id @default(cuid())
+  missionId             String
+  localName             String
+  canonicalArtifactType ArtifactType
+  confidence            Float?
+  validatedByConsultant Boolean      @default(false)
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+
+  mission Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+
+  @@unique([missionId, localName])
+}
+
+model StatusMapping {
+  id                    String          @id @default(cuid())
+  missionId             String
+  localStatus           String
+  canonicalStatus       CanonicalStatus
+  meaning               String?
+  validatedByConsultant Boolean         @default(false)
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  mission Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+
+  @@unique([missionId, localStatus])
+}
+
+model RoleMapping {
+  id                    String        @id @default(cuid())
+  missionId             String
+  localRole             String
+  canonicalRole         CanonicalRole
+  validatedByConsultant Boolean       @default(false)
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  mission Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+
+  @@unique([missionId, localRole])
+}
+
+model Role {
+  id            String        @id @default(cuid())
+  missionId     String
+  name          String
+  canonicalRole CanonicalRole @default(OTHER)
+  description   String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  mission Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  persons Person[]
+  raciAssignments RaciAssignment[]
+  responsibleSteps TheoreticalFlowStep[] @relation("ResponsibleRole")
+  validatorSteps   TheoreticalFlowStep[] @relation("ValidatorRole")
+
+  @@index([missionId])
+}
+
+model Person {
+  id           String   @id @default(cuid())
+  missionId    String
+  name         String
+  email        String?
+  roleId       String?
+  team         String?
+  department   String?
+  managerId    String?
+  source       String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  mission Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  role    Role?   @relation(fields: [roleId], references: [id], onDelete: SetNull)
+  manager Person? @relation("PersonManager", fields: [managerId], references: [id], onDelete: SetNull)
+  reports Person[] @relation("PersonManager")
+  createdArtifacts CanonicalArtifact[] @relation("ArtifactCreator")
+  assignedArtifacts CanonicalArtifact[] @relation("ArtifactAssignee")
+  canonicalEvents CanonicalEvent[]
+  hypothesisPersons HypothesisPerson[]
+  interviews Interview[]
+
+  @@index([missionId])
+  @@index([roleId])
+  @@index([managerId])
+}
+
+model Activity {
+  id          String   @id @default(cuid())
+  missionId   String
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  mission Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  raciAssignments RaciAssignment[]
+
+  @@index([missionId])
+}
+
+model RaciAssignment {
+  id         String    @id @default(cuid())
+  missionId  String
+  activityId String
+  roleId     String
+  level      RaciLevel
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  mission  Mission  @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  activity Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  role     Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([activityId, roleId, level])
+  @@index([missionId])
+}
+
+model TheoreticalFlow {
+  id          String   @id @default(cuid())
+  missionId   String
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  mission Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  steps TheoreticalFlowStep[]
+
+  @@index([missionId])
+}
+
+model TheoreticalFlowStep {
+  id                String   @id @default(cuid())
+  flowId            String
+  order             Int
+  name              String
+  description       String?
+  responsibleRoleId String?
+  validatorRoleId   String?
+  expectedDuration  Int?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  flow TheoreticalFlow @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  responsibleRole Role? @relation("ResponsibleRole", fields: [responsibleRoleId], references: [id], onDelete: SetNull)
+  validatorRole   Role? @relation("ValidatorRole", fields: [validatorRoleId], references: [id], onDelete: SetNull)
+
+  @@unique([flowId, order])
+}
+
+model CanonicalArtifact {
+  id                 String          @id @default(cuid())
+  missionId           String
+  sourceId            String?
+  externalId          String?
+  key                 String?
+  title               String
+  description         String?
+  artifactType        ArtifactType
+  status              CanonicalStatus @default(IDEA)
+  parentId            String?
+  creatorPersonId     String?
+  assigneePersonId    String?
+  createdAtExternal   DateTime?
+  updatedAtExternal   DateTime?
+  resolvedAtExternal  DateTime?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  mission Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  source  Source?  @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  parent  CanonicalArtifact? @relation("ArtifactParent", fields: [parentId], references: [id], onDelete: SetNull)
+  children CanonicalArtifact[] @relation("ArtifactParent")
+  creator Person? @relation("ArtifactCreator", fields: [creatorPersonId], references: [id], onDelete: SetNull)
+  assignee Person? @relation("ArtifactAssignee", fields: [assigneePersonId], references: [id], onDelete: SetNull)
+  events CanonicalEvent[]
+  proofs Proof[]
+
+  @@index([missionId])
+  @@index([sourceId])
+  @@index([externalId])
+  @@index([key])
+  @@index([artifactType])
+  @@index([status])
+}
+
+model CanonicalEvent {
+  id              String             @id @default(cuid())
+  missionId       String
+  artifactId      String
+  personId        String?
+  eventType       CanonicalEventType
+  field           String?
+  fromValue       String?
+  toValue         String?
+  content         String?
+  occurredAt      DateTime
+  sourceRawDataId String?
+  createdAt       DateTime           @default(now())
+
+  mission Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  artifact CanonicalArtifact @relation(fields: [artifactId], references: [id], onDelete: Cascade)
+  person Person? @relation(fields: [personId], references: [id], onDelete: SetNull)
+  sourceRawData RawData? @relation(fields: [sourceRawDataId], references: [id], onDelete: SetNull)
+  proofs Proof[]
+
+  @@index([missionId])
+  @@index([artifactId])
+  @@index([personId])
+  @@index([eventType])
+  @@index([occurredAt])
+}
+
+model Sprint {
+  id         String   @id @default(cuid())
+  missionId  String
+  externalId String?
+  name       String
+  goal       String?
+  startDate  DateTime?
+  endDate    DateTime?
+  state      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  mission Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+
+  @@index([missionId])
+}
+
+model PI {
+  id        String   @id @default(cuid())
+  missionId String
+  name      String
+  startDate DateTime?
+  endDate   DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  mission Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+
+  @@index([missionId])
+}
+
+model Metric {
+  id          String   @id @default(cuid())
+  missionId   String
+  code        String
+  family      String
+  label       String
+  value       Float
+  unit        String?
+  scope       String?
+  periodStart DateTime?
+  periodEnd   DateTime?
+  metadataJson Json?
+  createdAt   DateTime @default(now())
+
+  mission Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  phenomenonDetections PhenomenonDetection[]
+
+  @@index([missionId])
+  @@index([code])
+  @@index([family])
+}
+
+model PhenomenonDefinition {
+  id                       String   @id @default(cuid())
+  code                     String   @unique
+  family                   String
+  name                     String
+  description              String
+  calculationDescription   String?
+  defaultThresholdInfo     Float?
+  defaultThresholdWarning  Float?
+  defaultThresholdCritical Float?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  detections PhenomenonDetection[]
+}
+
+model PhenomenonDetection {
+  id                       String         @id @default(cuid())
+  missionId                String
+  phenomenonDefinitionId   String
+  metricId                 String?
+  level                    DetectionLevel
+  summary                  String
+  details                  String?
+  createdAt                DateTime       @default(now())
+
+  mission Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  phenomenonDefinition PhenomenonDefinition @relation(fields: [phenomenonDefinitionId], references: [id], onDelete: Restrict)
+  metric Metric? @relation(fields: [metricId], references: [id], onDelete: SetNull)
+  observations Observation[]
+
+  @@index([missionId])
+  @@index([phenomenonDefinitionId])
+  @@index([metricId])
+}
+
+model Observation {
+  id                    String            @id @default(cuid())
+  missionId              String
+  phenomenonDetectionId  String?
+  family                 String
+  title                  String
+  description            String
+  observedValue          Float?
+  unit                   String?
+  level                  DetectionLevel    @default(INFORMATION)
+  status                 ObservationStatus @default(PROPOSED)
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
+
+  mission Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  phenomenonDetection PhenomenonDetection? @relation(fields: [phenomenonDetectionId], references: [id], onDelete: SetNull)
+  proofs Proof[]
+  gaps Gap[]
+  hypotheses Hypothesis[]
+  investigationQuestions InvestigationQuestion[]
+  synthesisLinks SynthesisObservation[]
+
+  @@index([missionId])
+  @@index([family])
+  @@index([status])
+}
+
+model Proof {
+  id            String    @id @default(cuid())
+  missionId     String
+  observationId String
+  artifactId    String?
+  eventId       String?
+  type          ProofType
+  reference     String?
+  description   String?
+  payloadJson   Json?
+  createdAt     DateTime  @default(now())
+
+  mission Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  observation Observation @relation(fields: [observationId], references: [id], onDelete: Cascade)
+  artifact CanonicalArtifact? @relation(fields: [artifactId], references: [id], onDelete: SetNull)
+  event CanonicalEvent? @relation(fields: [eventId], references: [id], onDelete: SetNull)
+
+  @@index([missionId])
+  @@index([observationId])
+  @@index([artifactId])
+  @@index([eventId])
+}
+
+model Gap {
+  id                 String            @id @default(cuid())
+  missionId          String
+  observationId      String?
+  theoreticalElement String
+  observedElement    String
+  classification     GapClassification
+  description        String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  mission Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  observation Observation? @relation(fields: [observationId], references: [id], onDelete: SetNull)
+
+  @@index([missionId])
+  @@index([classification])
+}
+
+model Hypothesis {
+  id              String           @id @default(cuid())
+  missionId        String
+  observationId    String?
+  description      String
+  status           HypothesisStatus @default(SUGGESTED)
+  confidenceLabel  ConfidenceLabel  @default(MEDIUM)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  mission Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  observation Observation? @relation(fields: [observationId], references: [id], onDelete: SetNull)
+  investigationQuestions InvestigationQuestion[]
+  hypothesisPersons HypothesisPerson[]
+  synthesisLinks SynthesisHypothesis[]
+
+  @@index([missionId])
+  @@index([observationId])
+  @@index([status])
+}
+
+model InvestigationQuestion {
+  id            String   @id @default(cuid())
+  missionId     String
+  observationId String?
+  hypothesisId  String?
+  question      String
+  createdAt     DateTime @default(now())
+
+  mission Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  observation Observation? @relation(fields: [observationId], references: [id], onDelete: SetNull)
+  hypothesis Hypothesis? @relation(fields: [hypothesisId], references: [id], onDelete: SetNull)
+
+  @@index([missionId])
+  @@index([observationId])
+  @@index([hypothesisId])
+}
+
+model HypothesisPerson {
+  id           String   @id @default(cuid())
+  hypothesisId String
+  personId     String
+  reason       String?
+  priority     Priority @default(MEDIUM)
+  createdAt    DateTime @default(now())
+
+  hypothesis Hypothesis @relation(fields: [hypothesisId], references: [id], onDelete: Cascade)
+  person Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@unique([hypothesisId, personId])
+}
+
+model Interview {
+  id          String          @id @default(cuid())
+  missionId   String
+  personId    String
+  plannedAt   DateTime?
+  completedAt DateTime?
+  status      InterviewStatus @default(PLANNED)
+  notes       String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  mission Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  person Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@index([missionId])
+  @@index([personId])
+  @@index([status])
+}
+
+model InvestigationSynthesis {
+  id                      String   @id @default(cuid())
+  missionId                String   @unique
+  observedFacts            String?
+  convergingElements       String?
+  retainedUnderstandings   String?
+  remainingUncertainties   String?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  mission Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  observations SynthesisObservation[]
+  hypotheses SynthesisHypothesis[]
+}
+
+model SynthesisObservation {
+  id            String   @id @default(cuid())
+  synthesisId   String
+  observationId String
+  createdAt     DateTime @default(now())
+
+  synthesis InvestigationSynthesis @relation(fields: [synthesisId], references: [id], onDelete: Cascade)
+  observation Observation @relation(fields: [observationId], references: [id], onDelete: Cascade)
+
+  @@unique([synthesisId, observationId])
+}
+
+model SynthesisHypothesis {
+  id           String   @id @default(cuid())
+  synthesisId  String
+  hypothesisId String
+  createdAt    DateTime @default(now())
+
+  synthesis InvestigationSynthesis @relation(fields: [synthesisId], references: [id], onDelete: Cascade)
+  hypothesis Hypothesis @relation(fields: [hypothesisId], references: [id], onDelete: Cascade)
+
+  @@unique([synthesisId, hypothesisId])
+}
+
+model Deliverable {
+  id          String            @id @default(cuid())
+  missionId   String
+  type        DeliverableType
+  version     Int               @default(1)
+  status      DeliverableStatus @default(DRAFT)
+  filePath    String?
+  generatedAt DateTime?
+  createdAt   DateTime          @default(now())
+
+  mission Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+
+  @@index([missionId])
+  @@index([type])
+  @@unique([missionId, type, version])
+}
