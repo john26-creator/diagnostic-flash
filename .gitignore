@@ -64,6 +64,11 @@ prisma/dev.db-journal
 # Local work folders
 # =========================
 outputs/
+work/
+# =========================
+# Local work folders
+# =========================
+uploads/
 
 # =========================
 # Codex local metadata

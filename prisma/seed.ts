@@ -43,6 +43,7 @@ async function main() {
           investigationPurpose: "Identifier les zones d'attention et preparer les entretiens terrain.",
           initialScope: "Train Paiement, Jira et roles de validation.",
           observedScope: "Flux Feature vers Done sur mai-juin 2026.",
+          status: "VALIDATED",
           validatedAt: new Date()
         }
       }
@@ -65,6 +66,30 @@ async function main() {
       { needId: need.id, type: "AMBIGUITY", question: "Quels retards sont observes et sur quelle periode ?", sourceText: need.rawNeed },
       { needId: need.id, type: "OMISSION", question: "Quels flux et equipes doivent etre exclus du perimetre ?", sourceText: need.rawNeed },
       { needId: need.id, type: "LACK_OF_CONTEXT", question: "Quelles preuves sont deja disponibles dans Jira ou la documentation ?", sourceText: need.rawNeed }
+    ]
+  });
+
+  await prisma.source.deleteMany({ where: { missionId: mission.id } });
+  await prisma.source.createMany({
+    data: [
+      {
+        missionId: mission.id,
+        type: "ORG_CHART",
+        name: "Organigramme train Paiement",
+        description: "Structure cible declaree par le sponsor.",
+        referenceUrl: "Confluence / Paiement / Organisation",
+        status: "USED_IN_MODEL",
+        importedAt: new Date()
+      },
+      {
+        missionId: mission.id,
+        type: "RACI",
+        name: "RACI validation Feature",
+        description: "Roles attendus sur le flux Feature vers Done.",
+        referenceUrl: "Confluence / Paiement / RACI",
+        status: "IMPORTED",
+        importedAt: new Date()
+      }
     ]
   });
 

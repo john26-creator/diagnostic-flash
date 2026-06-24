@@ -51,6 +51,14 @@ npm run prisma:studio
 npm run db:seed
 ```
 
+## Tests
+
+```bash
+npm run test
+```
+
+Le moteur de clarification MVP est teste sans appel IA. La validation du besoin reste conditionnelle : les questions ouvertes demandent une confirmation consultant avant validation.
+
 ## Exports livrables
 
 Chaque ecran de mission expose un bouton `Exporter PDF`.

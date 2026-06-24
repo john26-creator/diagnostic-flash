@@ -22,7 +22,8 @@ export async function getMission(userId: string, missionId: string) {
     include: {
       client: true,
       need: { include: { symptoms: true, aiClarifications: true } },
-      sources: true,
+      sources: { orderBy: { createdAt: "desc" } },
+      sourceDocumentaires: { orderBy: { dateAjout: "desc" } },
       roles: true,
       persons: { include: { role: true } },
       activities: { include: { raciAssignments: { include: { role: true } } } },

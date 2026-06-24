@@ -5,18 +5,37 @@ import { requireUser } from "@/lib/auth";
 import { getMission } from "@/lib/services/mission-service";
 import { seedTheoryAction } from "@/lib/actions/actions";
 import { ExportActions } from "@/components/export-actions";
+import { redirect } from "next/navigation";
+import { SourceDocumentsPanel } from "@/app/app/missions/[missionId]/organization/source-documents-panel";
 
 export default async function OrganizationPage({ params }: { params: Promise<{ missionId: string }> }) {
   const { missionId } = await params;
   const user = await requireUser();
   const mission = await getMission(user.id, missionId);
+  if (mission.need?.status !== "VALIDATED" && mission.need?.status !== "VALIDATED_WITH_OPEN_QUESTIONS") {
+    redirect(`/app/missions/${mission.id}/need`);
+  }
   return (
     <>
       <PageHeader title="Organisation theorique" description="Modele attendu valide par le consultant : roles, RACI et flux cible." status={mission.status}>
         <ExportActions missionId={mission.id} type="theoretical-model" />
-        <form action={seedTheoryAction.bind(null, mission.id)}><Button type="submit">Generer modele demo</Button></form>
+        <form action={seedTheoryAction.bind(null, mission.id)}><Button type="submit">Generer modele theorique demo</Button></form>
       </PageHeader>
       <main className="grid gap-6 p-6 xl:grid-cols-2">
+        <SourceDocumentsPanel
+          missionId={mission.id}
+          initialSources={mission.sourceDocumentaires.map((source) => ({
+            id: source.id,
+            type: source.type,
+            nom: source.nom,
+            description: source.description,
+            fichierNom: source.fichierNom,
+            fichierTaille: source.fichierTaille,
+            referenceUrl: source.referenceUrl,
+            statut: source.statut,
+            dateAjout: source.dateAjout.toISOString()
+          }))}
+        />
         <Card>
           <CardHeader><CardTitle>Roles et mapping</CardTitle></CardHeader>
           <CardContent className="grid gap-3">

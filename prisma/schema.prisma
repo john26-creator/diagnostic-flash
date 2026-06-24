@@ -41,12 +41,30 @@ enum ClarificationStatus {
   RESOLVED
 }
 
+enum NeedStatus {
+  DRAFT
+  NEEDS_CLARIFICATION
+  VALIDATED
+  VALIDATED_WITH_OPEN_QUESTIONS
+}
+
 enum SourceType {
   JIRA
   ORGANIGRAM
+  ORG_CHART
+  ORGANIGRAMME
   RACI
+  JOB_DESCRIPTION
+  FICHE_POSTE
+  PROCESS_DOCUMENTATION
+  PROCESSUS
+  MODE_OPERATOIRE
+  WORKFLOW_JIRA
+  OTHER
+  AUTRE
   SLA
   CONFLUENCE
+  INCIDENT
   DOCUMENT
   CSV
   MANUAL
@@ -56,8 +74,18 @@ enum SourceStatus {
   PENDING
   CONNECTED
   IMPORTED
+  TO_REVIEW
+  REVIEWED
+  USED_IN_MODEL
   FAILED
   ARCHIVED
+}
+
+enum SourceStatut {
+  IMPORTEE
+  ANALYSEE
+  UTILISEE
+  ERREUR
 }
 
 enum RawDataType {
@@ -257,6 +285,7 @@ model Mission {
   user                     User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
   need                     Need?
   sources                  Source[]
+  sourceDocumentaires      SourceDocumentaire[]
   rawData                  RawData[]
   detectedConfigurations   DetectedConfiguration[]
   artifactMappings         ArtifactMapping[]
@@ -295,6 +324,7 @@ model Need {
   investigationPurpose String?
   initialScope         String?
   observedScope        String?
+  status               NeedStatus @default(DRAFT)
   validatedAt          DateTime?
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
@@ -339,6 +369,8 @@ model Source {
   missionId      String
   type           SourceType
   name           String
+  description    String?
+  referenceUrl   String?
   status         SourceStatus @default(PENDING)
   connectionInfo Json?
   filePath       String?
@@ -354,6 +386,29 @@ model Source {
   @@index([missionId])
   @@index([type])
   @@index([status])
+}
+
+model SourceDocumentaire {
+  id            String       @id @default(cuid())
+  missionId     String
+  type          SourceType
+  nom           String
+  description   String?
+  fichierNom    String?
+  fichierPath   String?
+  fichierTaille Int?
+  referenceUrl  String?
+  statut        SourceStatut @default(IMPORTEE)
+  dateAjout     DateTime     @default(now())
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  mission Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+
+  @@index([missionId])
+  @@index([type])
+  @@index([statut])
+  @@index([dateAjout])
 }
 
 model RawData {
