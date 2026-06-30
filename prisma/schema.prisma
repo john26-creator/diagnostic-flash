@@ -129,6 +129,21 @@ enum JiraWorkflowType {
   UNKNOWN
 }
 
+enum JiraBoardLevel {
+  PORTFOLIO
+  TRAIN
+  TEAM
+  SUPPORT_OPS
+  UNKNOWN
+}
+
+enum JiraClassificationStatus {
+  DETECTED
+  CONFIRMED
+  CORRECTED
+  REJECTED
+}
+
 enum RawDataType {
   RAW_JIRA_ISSUE
   RAW_JIRA_COMMENT
@@ -331,6 +346,11 @@ model Mission {
   theoreticalExtractions   TheoreticalExtraction[]
   theoreticalExtractionItems TheoreticalExtractionItem[]
   jiraInstance             JiraInstance?
+  demoDatasets             DemoDataset[]
+  demoDatasetLoaded        DemoDatasetLoaded[]
+  jiraIssues               JiraIssue[]
+  jiraSprints              JiraSprint[]
+  expectedPhenomena        ExpectedPhenomenon[]
   rawData                  RawData[]
   detectedConfigurations   DetectedConfiguration[]
   artifactMappings         ArtifactMapping[]
@@ -523,8 +543,65 @@ model JiraInstance {
   projects  JiraProject[]
   boards    JiraBoard[]
   workflows JiraWorkflow[]
+  issues    JiraIssue[]
+  sprints   JiraSprint[]
+  expectedPhenomena ExpectedPhenomenon[]
 
   @@index([status])
+}
+
+model DemoDataset {
+  id          String   @id @default(cuid())
+  missionId   String
+  name        String
+  description String
+  version     String
+  loadedAt    DateTime @default(now())
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  mission Mission @relation(fields: [missionId], references: [id], onDelete: Cascade)
+
+  @@unique([missionId, name, version])
+  @@index([missionId])
+  @@index([isActive])
+}
+
+model DemoDatasetTemplate {
+  id                  String   @id @default(cuid())
+  code                String   @unique
+  name                String
+  description         String
+  category            String
+  difficulty          String
+  version             String
+  estimatedTickets    Int
+  estimatedProjects   Int
+  estimatedBoards     Int
+  expectedPhenomena   Json
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  loadedDatasets DemoDatasetLoaded[]
+}
+
+model DemoDatasetLoaded {
+  id         String   @id @default(cuid())
+  missionId  String
+  templateId String
+  loadedAt   DateTime @default(now())
+  version    String
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  mission  Mission             @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  template DemoDatasetTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
+
+  @@index([missionId])
+  @@index([templateId])
+  @@index([isActive])
 }
 
 model JiraProject {
@@ -533,34 +610,58 @@ model JiraProject {
   externalId     String
   key            String
   name           String
+  isDemo         Boolean  @default(false)
+  demoDatasetName String?
+  datasetId      String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   jiraInstance JiraInstance @relation(fields: [jiraInstanceId], references: [id], onDelete: Cascade)
   boards       JiraBoard[]
+  issues       JiraIssue[]
 
   @@unique([jiraInstanceId, externalId])
   @@unique([jiraInstanceId, key])
   @@index([jiraInstanceId])
+  @@index([isDemo])
+  @@index([demoDatasetName])
+  @@index([datasetId])
 }
 
 model JiraBoard {
-  id             String   @id @default(cuid())
-  jiraInstanceId String
-  projectId      String?
-  externalId     Int
-  name           String
-  type           String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id                   String                   @id @default(cuid())
+  jiraInstanceId       String
+  projectId            String?
+  parentBoardId        String?
+  externalId           Int
+  name                 String
+  type                 String?
+  level                JiraBoardLevel           @default(UNKNOWN)
+  correctedLevel       JiraBoardLevel?
+  classificationStatus JiraClassificationStatus @default(DETECTED)
+  isDemo               Boolean                  @default(false)
+  demoDatasetName      String?
+  datasetId            String?
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
 
   jiraInstance JiraInstance @relation(fields: [jiraInstanceId], references: [id], onDelete: Cascade)
   project      JiraProject? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  parentBoard  JiraBoard?   @relation("JiraBoardParent", fields: [parentBoardId], references: [id], onDelete: SetNull)
+  childBoards  JiraBoard[]  @relation("JiraBoardParent")
   workflow     JiraWorkflow?
+  issues       JiraIssue[]
+  sprints      JiraSprint[]
 
   @@unique([jiraInstanceId, externalId])
   @@index([jiraInstanceId])
   @@index([projectId])
+  @@index([parentBoardId])
+  @@index([level])
+  @@index([classificationStatus])
+  @@index([isDemo])
+  @@index([demoDatasetName])
+  @@index([datasetId])
 }
 
 model JiraWorkflow {
@@ -569,15 +670,22 @@ model JiraWorkflow {
   boardId        String           @unique
   name           String
   type           JiraWorkflowType @default(UNKNOWN)
+  isDemo         Boolean          @default(false)
+  demoDatasetName String?
+  datasetId      String?
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
 
   jiraInstance JiraInstance       @relation(fields: [jiraInstanceId], references: [id], onDelete: Cascade)
   board        JiraBoard          @relation(fields: [boardId], references: [id], onDelete: Cascade)
   steps        JiraWorkflowStep[]
+  issues       JiraIssue[]
 
   @@index([jiraInstanceId])
   @@index([type])
+  @@index([isDemo])
+  @@index([demoDatasetName])
+  @@index([datasetId])
 }
 
 model JiraWorkflowStep {
@@ -585,6 +693,9 @@ model JiraWorkflowStep {
   workflowId String
   order      Int
   name       String
+  isDemo     Boolean  @default(false)
+  demoDatasetName String?
+  datasetId  String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -593,6 +704,9 @@ model JiraWorkflowStep {
 
   @@unique([workflowId, order])
   @@index([workflowId])
+  @@index([isDemo])
+  @@index([demoDatasetName])
+  @@index([datasetId])
 }
 
 model JiraStatus {
@@ -600,6 +714,9 @@ model JiraStatus {
   stepId    String
   externalId String?
   name      String
+  isDemo    Boolean  @default(false)
+  demoDatasetName String?
+  datasetId String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -608,6 +725,255 @@ model JiraStatus {
   @@unique([stepId, name])
   @@index([stepId])
   @@index([externalId])
+  @@index([isDemo])
+  @@index([demoDatasetName])
+  @@index([datasetId])
+}
+
+model JiraIssue {
+  id                String   @id @default(cuid())
+  missionId         String
+  jiraInstanceId    String
+  jiraProjectId     String
+  jiraBoardId       String
+  jiraWorkflowId    String?
+  parentIssueId     String?
+  externalId        String
+  key               String
+  title             String
+  description       String?
+  issueType         String
+  priority          String?
+  status            String
+  assignee          String?
+  reporter          String?
+  createdAtJira     DateTime
+  updatedAtJira     DateTime
+  resolvedAtJira    DateTime?
+  storyPoints       Float?
+  originalEstimate  Int?
+  remainingEstimate Int?
+  timeSpent         Int?
+  isDemo            Boolean  @default(false)
+  demoDatasetName   String?
+  datasetId         String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  mission      Mission       @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  jiraInstance JiraInstance  @relation(fields: [jiraInstanceId], references: [id], onDelete: Cascade)
+  jiraProject  JiraProject   @relation(fields: [jiraProjectId], references: [id], onDelete: Cascade)
+  jiraBoard    JiraBoard     @relation(fields: [jiraBoardId], references: [id], onDelete: Cascade)
+  jiraWorkflow JiraWorkflow? @relation(fields: [jiraWorkflowId], references: [id], onDelete: SetNull)
+  parentIssue  JiraIssue?    @relation("JiraIssueParent", fields: [parentIssueId], references: [id], onDelete: SetNull)
+  childIssues  JiraIssue[]   @relation("JiraIssueParent")
+  transitions  JiraIssueTransition[]
+  comments     JiraIssueComment[]
+  outgoingLinks JiraIssueLink[] @relation("JiraIssueLinkSource")
+  incomingLinks JiraIssueLink[] @relation("JiraIssueLinkTarget")
+  sprints      JiraIssueSprint[]
+  estimateHistory JiraIssueEstimateHistory[]
+
+  @@unique([jiraInstanceId, externalId])
+  @@unique([jiraInstanceId, key])
+  @@index([missionId])
+  @@index([jiraInstanceId])
+  @@index([jiraProjectId])
+  @@index([jiraBoardId])
+  @@index([jiraWorkflowId])
+  @@index([parentIssueId])
+  @@index([issueType])
+  @@index([status])
+  @@index([isDemo])
+  @@index([demoDatasetName])
+  @@index([datasetId])
+}
+
+model JiraIssueTransition {
+  id              String   @id @default(cuid())
+  missionId       String
+  jiraInstanceId  String
+  jiraIssueId     String
+  externalId      String
+  fromStatus      String?
+  toStatus        String
+  author          String?
+  transitionedAt  DateTime
+  isDemo          Boolean  @default(false)
+  demoDatasetName String?
+  datasetId       String?
+  createdAt       DateTime @default(now())
+
+  issue JiraIssue @relation(fields: [jiraIssueId], references: [id], onDelete: Cascade)
+
+  @@unique([jiraIssueId, externalId])
+  @@index([missionId])
+  @@index([jiraInstanceId])
+  @@index([jiraIssueId])
+  @@index([transitionedAt])
+  @@index([isDemo])
+  @@index([demoDatasetName])
+  @@index([datasetId])
+}
+
+model JiraIssueComment {
+  id              String   @id @default(cuid())
+  missionId       String
+  jiraInstanceId  String
+  jiraIssueId     String
+  externalId      String
+  author          String
+  body            String
+  createdAtJira   DateTime
+  isDemo          Boolean  @default(false)
+  demoDatasetName String?
+  datasetId       String?
+  createdAt       DateTime @default(now())
+
+  issue JiraIssue @relation(fields: [jiraIssueId], references: [id], onDelete: Cascade)
+
+  @@unique([jiraIssueId, externalId])
+  @@index([missionId])
+  @@index([jiraInstanceId])
+  @@index([jiraIssueId])
+  @@index([author])
+  @@index([isDemo])
+  @@index([demoDatasetName])
+  @@index([datasetId])
+}
+
+model JiraIssueLink {
+  id              String   @id @default(cuid())
+  missionId       String
+  jiraInstanceId  String
+  sourceIssueId   String
+  targetIssueId   String
+  linkType        String
+  isDemo          Boolean  @default(false)
+  demoDatasetName String?
+  datasetId       String?
+  createdAt       DateTime @default(now())
+
+  sourceIssue JiraIssue @relation("JiraIssueLinkSource", fields: [sourceIssueId], references: [id], onDelete: Cascade)
+  targetIssue JiraIssue @relation("JiraIssueLinkTarget", fields: [targetIssueId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceIssueId, targetIssueId, linkType])
+  @@index([missionId])
+  @@index([jiraInstanceId])
+  @@index([sourceIssueId])
+  @@index([targetIssueId])
+  @@index([isDemo])
+  @@index([demoDatasetName])
+  @@index([datasetId])
+}
+
+model JiraSprint {
+  id              String   @id @default(cuid())
+  missionId       String
+  jiraInstanceId  String
+  jiraBoardId     String
+  externalId      String
+  name            String
+  goal            String?
+  state           String
+  startDate       DateTime
+  endDate         DateTime
+  completedAt     DateTime?
+  isDemo          Boolean  @default(false)
+  demoDatasetName String?
+  datasetId       String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  mission      Mission      @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  jiraInstance JiraInstance @relation(fields: [jiraInstanceId], references: [id], onDelete: Cascade)
+  jiraBoard    JiraBoard    @relation(fields: [jiraBoardId], references: [id], onDelete: Cascade)
+  issues       JiraIssueSprint[]
+
+  @@unique([jiraInstanceId, externalId])
+  @@index([missionId])
+  @@index([jiraInstanceId])
+  @@index([jiraBoardId])
+  @@index([isDemo])
+  @@index([demoDatasetName])
+  @@index([datasetId])
+}
+
+model JiraIssueSprint {
+  id              String   @id @default(cuid())
+  jiraIssueId     String
+  jiraSprintId    String
+  addedAt         DateTime
+  addedAfterStart Boolean  @default(false)
+  isDemo          Boolean  @default(false)
+  demoDatasetName String?
+  datasetId       String?
+
+  issue  JiraIssue  @relation(fields: [jiraIssueId], references: [id], onDelete: Cascade)
+  sprint JiraSprint @relation(fields: [jiraSprintId], references: [id], onDelete: Cascade)
+
+  @@unique([jiraIssueId, jiraSprintId])
+  @@index([jiraIssueId])
+  @@index([jiraSprintId])
+  @@index([isDemo])
+  @@index([demoDatasetName])
+  @@index([datasetId])
+}
+
+model JiraIssueEstimateHistory {
+  id              String   @id @default(cuid())
+  missionId       String
+  jiraInstanceId  String
+  jiraIssueId     String
+  externalId      String
+  previousStoryPoints Float?
+  newStoryPoints      Float?
+  previousEstimate    Int?
+  newEstimate         Int?
+  changedBy       String
+  changedAt       DateTime
+  isDemo          Boolean  @default(false)
+  demoDatasetName String?
+  datasetId       String?
+
+  issue JiraIssue @relation(fields: [jiraIssueId], references: [id], onDelete: Cascade)
+
+  @@unique([jiraIssueId, externalId])
+  @@index([missionId])
+  @@index([jiraInstanceId])
+  @@index([jiraIssueId])
+  @@index([changedAt])
+  @@index([isDemo])
+  @@index([demoDatasetName])
+  @@index([datasetId])
+}
+
+model ExpectedPhenomenon {
+  id                     String   @id @default(cuid())
+  missionId              String
+  jiraInstanceId         String?
+  code                   String
+  label                  String
+  description            String
+  concernedData          Json
+  expectedResult         String
+  investigationQuestions Json
+  isDemo                 Boolean  @default(false)
+  demoDatasetName        String?
+  datasetId              String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  mission      Mission       @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  jiraInstance JiraInstance? @relation(fields: [jiraInstanceId], references: [id], onDelete: Cascade)
+
+  @@unique([missionId, demoDatasetName, code])
+  @@index([missionId])
+  @@index([jiraInstanceId])
+  @@index([code])
+  @@index([isDemo])
+  @@index([demoDatasetName])
+  @@index([datasetId])
 }
 
 model RawData {

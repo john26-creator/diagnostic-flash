@@ -1,4 +1,4 @@
-import type { JiraWorkflowType } from "@prisma/client";
+import type { JiraBoardLevel, JiraWorkflowType } from "@prisma/client";
 
 export type JiraCredentials = {
   url: string;
@@ -159,6 +159,15 @@ export function classifyJiraWorkflow(boardName: string | null | undefined): Jira
   const normalized = normalize(boardName ?? "");
   if (!normalized) return "UNKNOWN";
   if (["train", "art", "program", "paiement"].some((signal) => normalized.includes(signal))) return "TRAIN";
+  return "TEAM";
+}
+
+export function classifyJiraBoardLevel(boardName: string | null | undefined, projectName?: string | null): JiraBoardLevel {
+  const normalized = normalize(`${boardName ?? ""} ${projectName ?? ""}`);
+  if (!normalized) return "UNKNOWN";
+  if (["portfolio", "initiative", "epic", "strategy"].some((signal) => normalized.includes(signal))) return "PORTFOLIO";
+  if (["train", "art", "program"].some((signal) => normalized.includes(signal)) || /\bpi\b/.test(normalized)) return "TRAIN";
+  if (["support", "run", "ops", "incident", "exploitation"].some((signal) => normalized.includes(signal))) return "SUPPORT_OPS";
   return "TEAM";
 }
 

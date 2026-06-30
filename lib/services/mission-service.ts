@@ -24,9 +24,20 @@ export async function getMission(userId: string, missionId: string) {
       need: { include: { symptoms: true, aiClarifications: true } },
       sources: { orderBy: { createdAt: "desc" } },
       sourceDocumentaires: { orderBy: { dateAjout: "desc" } },
+      demoDatasets: { where: { isActive: true }, orderBy: { loadedAt: "desc" }, take: 1 },
+      demoDatasetLoaded: { where: { isActive: true }, include: { template: true }, orderBy: { loadedAt: "desc" }, take: 1 },
       jiraInstance: {
         include: {
           projects: { orderBy: { key: "asc" } },
+          issues: {
+            where: { isDemo: true },
+            select: {
+              id: true,
+              _count: { select: { transitions: true, comments: true, outgoingLinks: true } }
+            }
+          },
+          sprints: { where: { isDemo: true }, select: { id: true } },
+          expectedPhenomena: { where: { isDemo: true }, orderBy: { code: "asc" } },
           boards: {
             orderBy: { name: "asc" },
             include: {
@@ -36,6 +47,16 @@ export async function getMission(userId: string, missionId: string) {
                   steps: { orderBy: { order: "asc" }, include: { statuses: { orderBy: { name: "asc" } } } }
                 }
               }
+            }
+          },
+          _count: {
+            select: {
+              projects: true,
+              boards: true,
+              workflows: true,
+              issues: true,
+              sprints: true,
+              expectedPhenomena: true
             }
           }
         }

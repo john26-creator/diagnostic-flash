@@ -17,7 +17,7 @@ import {
 } from "@/lib/services/theoretical-extraction-service";
 import { runMockAnalysis } from "@/lib/analysis/mock-engine";
 import { CanonicalRole, ExtractionIAStatus } from "@prisma/client";
-import { saveJiraConnection, syncJira, testJiraConnection, type JiraActionState } from "@/lib/services/jira-service";
+import { deleteAllDemoData, loadDemoDatasetTemplate, loadJiraDemoDataset, loadRealisticJiraDemoDataset, resetActiveDemoDataset, saveJiraConnection, syncJira, testJiraConnection, updateJiraBoardClassification, type JiraActionState } from "@/lib/services/jira-service";
 
 export async function createClientAction(formData: FormData) {
   const user = await requireUser();
@@ -167,6 +167,53 @@ export async function syncJiraAction(missionId: string, _previousState: JiraActi
   revalidatePath(`/app/missions/${missionId}`);
   revalidatePath(`/app/missions/${missionId}/organization`);
   return result;
+}
+
+export async function loadJiraDemoDatasetAction(missionId: string, _previousState: JiraActionState): Promise<JiraActionState> {
+  const user = await requireUser();
+  const result = await loadJiraDemoDataset(user.id, missionId);
+  revalidatePath(`/app/missions/${missionId}`);
+  revalidatePath(`/app/missions/${missionId}/organization`);
+  return result;
+}
+
+export async function loadRealisticJiraDemoDatasetAction(missionId: string, _previousState: JiraActionState): Promise<JiraActionState> {
+  const user = await requireUser();
+  const result = await loadRealisticJiraDemoDataset(user.id, missionId);
+  revalidatePath(`/app/missions/${missionId}`);
+  revalidatePath(`/app/missions/${missionId}/organization`);
+  return result;
+}
+
+export async function loadDemoDatasetTemplateAction(missionId: string, templateCode: string, _previousState: JiraActionState): Promise<JiraActionState> {
+  const user = await requireUser();
+  const result = await loadDemoDatasetTemplate(user.id, missionId, templateCode);
+  revalidatePath(`/app/missions/${missionId}`);
+  revalidatePath(`/app/missions/${missionId}/organization`);
+  return result;
+}
+
+export async function resetActiveDemoDatasetAction(missionId: string, _previousState: JiraActionState): Promise<JiraActionState> {
+  const user = await requireUser();
+  const result = await resetActiveDemoDataset(user.id, missionId);
+  revalidatePath(`/app/missions/${missionId}`);
+  revalidatePath(`/app/missions/${missionId}/organization`);
+  return result;
+}
+
+export async function deleteAllDemoDataAction(missionId: string, _previousState: JiraActionState): Promise<JiraActionState> {
+  const user = await requireUser();
+  const result = await deleteAllDemoData(user.id, missionId);
+  revalidatePath(`/app/missions/${missionId}`);
+  revalidatePath(`/app/missions/${missionId}/organization`);
+  return result;
+}
+
+export async function updateJiraBoardClassificationAction(missionId: string, boardId: string, formData: FormData) {
+  const user = await requireUser();
+  await updateJiraBoardClassification(user.id, missionId, boardId, formData);
+  revalidatePath(`/app/missions/${missionId}`);
+  revalidatePath(`/app/missions/${missionId}/organization`);
 }
 
 function parseItemIds(value: string) {

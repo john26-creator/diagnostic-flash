@@ -1,12 +1,22 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildJiraAuthorizationHeader, classifyJiraWorkflow, deduplicateJiraSyncSnapshot, JiraRequestError, mapBoardToWorkflow } from "@/lib/jira/client";
+import { buildJiraAuthorizationHeader, classifyJiraBoardLevel, classifyJiraWorkflow, deduplicateJiraSyncSnapshot, JiraRequestError, mapBoardToWorkflow } from "@/lib/jira/client";
 
 test("classifie les workflows Jira en TRAIN TEAM UNKNOWN", () => {
   assert.equal(classifyJiraWorkflow("Train Paiement"), "TRAIN");
   assert.equal(classifyJiraWorkflow("ART Programme Client"), "TRAIN");
   assert.equal(classifyJiraWorkflow("Equipe API"), "TEAM");
   assert.equal(classifyJiraWorkflow(""), "UNKNOWN");
+});
+
+test("classifie automatiquement les espaces Jira par niveau organisationnel", () => {
+  assert.equal(classifyJiraBoardLevel("Portfolio Paiement"), "PORTFOLIO");
+  assert.equal(classifyJiraBoardLevel("Initiative Strategy Board"), "PORTFOLIO");
+  assert.equal(classifyJiraBoardLevel("Train Paiement PI"), "TRAIN");
+  assert.equal(classifyJiraBoardLevel("Support incidents exploitation"), "SUPPORT_OPS");
+  assert.equal(classifyJiraBoardLevel("Equipe API"), "TEAM");
+  assert.equal(classifyJiraBoardLevel("Scrum board", "Epic Portfolio"), "PORTFOLIO");
+  assert.equal(classifyJiraBoardLevel(""), "UNKNOWN");
 });
 
 test("mappe un board Jira en workflow avec colonnes et statuts", () => {
